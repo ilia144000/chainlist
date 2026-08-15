@@ -20,8 +20,8 @@ jobs:
           fetch-depth: 0
 
       - name: Patch extraRpcs.js
-        shell: python
         run: |
+          python3 - <<'PY'
           from pathlib import Path
 
           path = Path('constants/extraRpcs.js')
@@ -55,9 +55,9 @@ jobs:
               text = text.replace(rpc_anchor, rpc_anchor + rpc_entry, 1)
 
           path.write_text(text, encoding='utf-8')
+          PY
 
-      - name: Remove temporary workflow and commit patch
-        shell: bash
+      - name: Commit patch and remove temporary workflow
         run: |
           rm -f .github/workflows/patch-rannta-privacy.yml
           git config user.name "github-actions[bot]"
