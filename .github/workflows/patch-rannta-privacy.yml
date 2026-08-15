@@ -1,0 +1,67 @@
+name: Patch RANNTA RPC privacy metadata
+
+on:
+  push:
+    branches:
+      - rannta-rpc-privacy
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: rannta-rpc-privacy
+          fetch-depth: 0
+
+      - name: Patch extraRpcs.js
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('constants/extraRpcs.js')
+          text = path.read_text(encoding='utf-8')
+
+          privacy_anchor = 'const privacyStatement = {\n'
+          privacy_entry = (
+              '  rannta:\n'
+              '    "RANNTA X-Chain public RPC does not track users or correlate RPC requests with individual users. No advertising or third-party analytics are used on the public RPC endpoint. https://rannta.com/privacy",\n'
+          )
+          if '  rannta:\n' not in text:
+              if privacy_anchor not in text:
+                  raise SystemExit('privacyStatement anchor not found')
+              text = text.replace(privacy_anchor, privacy_anchor + privacy_entry, 1)
+
+          rpc_anchor = 'export const extraRpcs = {\n'
+          rpc_entry = (
+              '  13113: {\n'
+              '    rpcs: [\n'
+              '      {\n'
+              '        url: "https://rpc.rannta.com",\n'
+              '        tracking: "none",\n'
+              '        trackingDetails: privacyStatement.rannta,\n'
+              '      },\n'
+              '    ],\n'
+              '  },\n'
+          )
+          if '  13113: {\n' not in text:
+              if rpc_anchor not in text:
+                  raise SystemExit('extraRpcs anchor not found')
+              text = text.replace(rpc_anchor, rpc_anchor + rpc_entry, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+      - name: Remove temporary workflow and commit patch
+        shell: bash
+        run: |
+          rm -f .github/workflows/patch-rannta-privacy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add constants/extraRpcs.js .github/workflows/patch-rannta-privacy.yml
+          git commit -m "Add RANNTA X-Chain RPC privacy metadata"
+          git push origin HEAD:rannta-rpc-privacy
