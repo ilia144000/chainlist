@@ -1,7 +1,14 @@
 export const data = {
   name: "RANNTA X-Chain",
   chain: "RANNTA",
-  rpc: ["https://rpc.rannta.com/"],
+  rpc: [
+    {
+      url: "https://rpc.rannta.com/",
+      tracking: "none",
+      trackingDetails:
+        "RANNTA X-Chain public RPC does not track users or correlate RPC requests with individual users. No advertising or third-party analytics are used on the public RPC endpoint. https://rannta.com/privacy",
+    },
+  ],
   nativeCurrency: {
     name: "RANNTA Core X",
     symbol: "RNTX",
