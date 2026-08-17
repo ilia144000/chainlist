@@ -1,0 +1,94 @@
+name: Relocate RANNTA RPC metadata
+
+on:
+  push:
+    branches:
+      - rannta-rpc-privacy-v2
+    paths:
+      - .github/workflows/rannta-rpc-relocate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rannta-rpc-privacy-v2
+          fetch-depth: 0
+
+      - name: Apply requested RANNTA RPC relocation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          extra_path = Path("constants/extraRpcs.js")
+          text = extra_path.read_text(encoding="utf-8")
+
+          privacy_marker = "\n};\n\nexport const extraRpcs = {"
+          privacy_entry = (
+              "\n  rannta:\n"
+              "    \"RANNTA X-Chain public RPC does not track users or correlate RPC requests with individual users. No advertising or third-party analytics are used on the public RPC endpoint. https://rannta.com/privacy\","
+          )
+          if "privacyStatement.rannta" not in text and "  rannta:\n" not in text:
+              if privacy_marker not in text:
+                  raise SystemExit("privacyStatement insertion marker not found")
+              text = text.replace(privacy_marker, privacy_entry + privacy_marker, 1)
+
+          rpc_marker = "\n};\n\nexport default extraRpcs;"
+          rpc_entry = """
+  13113: {
+    rpcs: [
+      {
+        url: "https://rpc.rannta.com/",
+        tracking: "none",
+        trackingDetails: privacyStatement.rannta,
+      },
+    ],
+  },
+"""
+          if "  13113:" not in text:
+              if rpc_marker not in text:
+                  raise SystemExit("extraRpcs insertion marker not found")
+              text = text.replace(rpc_marker, "\n" + rpc_entry + "};\n\nexport default extraRpcs;", 1)
+
+          extra_path.write_text(text, encoding="utf-8")
+
+          chain_path = Path("constants/additionalChainRegistry/chainid-13113.js")
+          chain_path.write_text('''export const data = {
+  name: "RANNTA X-Chain",
+  chain: "RANNTA",
+  rpc: ["https://rpc.rannta.com/"],
+  nativeCurrency: {
+    name: "RANNTA Core X",
+    symbol: "RNTX",
+    decimals: 18,
+  },
+  features: [],
+  infoURL: "https://rannta.com/",
+  shortName: "rntx",
+  chainId: 13113,
+  networkId: 13113,
+  icon: "https://emerald-important-bat-644.mypinata.cloud/ipfs/bafkreidh2qtmdplg7wi2le7ump57gvfhoyrg565m4tgua3d4b6zgmojqwm",
+  explorers: [
+    {
+      name: "RANNTA X-Chain Explorer",
+      url: "https://explorer.rannta.com/",
+      icon: "https://emerald-important-bat-644.mypinata.cloud/ipfs/bafkreidh2qtmdplg7wi2le7ump57gvfhoyrg565m4tgua3d4b6zgmojqwm",
+      standard: "EIP3091",
+    },
+  ],
+};
+''', encoding="utf-8")
+
+      - name: Remove one-time workflow and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/rannta-rpc-relocate.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add constants/extraRpcs.js constants/additionalChainRegistry/chainid-13113.js .github/workflows/rannta-rpc-relocate.yml
+          git commit -m "fix: move RANNTA RPC metadata to extraRpcs"
+          git push origin HEAD:rannta-rpc-privacy-v2
